@@ -2,7 +2,8 @@
 layout: post
 title: Tracking your habit streaks with advanced queries in logseq
 date: 2023-09-16 21:21:00 +0200
-categories: logseq queries datascript
+tags: logseq queries datascript
+categories: logseq
 ---
 # Tracking your habit streaks with advanced queries in logseq
 

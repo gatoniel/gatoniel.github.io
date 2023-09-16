@@ -12,7 +12,7 @@ In this tutorial, I will walk you through an [advanced query](https://docs.logse
 
 The idea behind our query is based on this [blog post](https://agj.bearblog.dev/habit-tracking-in-logseq/): the tracking itself happens in the journal days in a specific block with the property `type` being set to `tracker`. This blog will contain one property for each habbit that you want to track. In the example below, we track the daily sport activities and our [Anki](https://apps.ankiweb.net/) usage. Furthermore, we will have one more property in this block, `backlink`. This property is a link to the journal entry of the previous day and it will come in handy later. As of the writing on 2023-08-28, I have done my daily round of Anki, but I haven't been out for sports yet. Therefore, my habits block on the daily journal page looks like this:
 
-![](data/images/2023-08-28-todays-tracking.png)
+![](/data/images/2023-08-28-todays-tracking.png)
 
 To automate the creation of the habit block and especially the `backlink`, I have added the following block to my daily journal template. By default the hobbies are set to false.
 
@@ -25,11 +25,11 @@ backlink:: <% yesterday %>
 
 Next, let's take a look at what my habit streaks for this day look like.
 
-![](data/images/2023-08-28-my-current-streaks.png)
+![](/data/images/2023-08-28-my-current-streaks.png)
 
 My tracker shows that I am on a 7 days streak with Anki that started on 2023-08-22. Furthermore, it shows me that the last time I made some sports was yesterday, as can also be seen by this entry for 2023-08-27.
 
-![](data/images/2023-08-28-yesterdays-tracking.png)
+![](/data/images/2023-08-28-yesterdays-tracking.png)
 
 ## The advanced query
 

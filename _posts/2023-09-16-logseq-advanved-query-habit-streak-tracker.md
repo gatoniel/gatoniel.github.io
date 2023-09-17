@@ -392,11 +392,126 @@ Once your habits extend to 30+ days you might see that this query still takes up
 
 ### Advanced
 
-If a habit was not yet done today, the only information being displayed is when the habit was done last. Can you script a query that distinguishes between a habit that was last done yesterday (a streak that has to be continued today) and a habit that you stopped doing long ago (you will not lose a currently runnning streak if you miss this habit today). I have not modified the query for this myself. Until I can supply you with a working solution, here are some thoughts:
+If a habit was not yet done today, the only information being displayed is when the habit was done last. Can you script a query that distinguishes between a habit that was last done yesterday (a streak that has to be continued today) and a habit that you stopped doing long ago (you will not lose a currently runnning streak if you miss this habit today). For an illustration of the problem consider the following table.
+
+![](/data/images/2023-09-17-advanced-streak-tracking.png)
+
+This table shows that the Anki habit was done today (49 days streak). The Duolingo habit was not done yet, but up to yesterday it was done---up to yesterday the streak was 48 days. The meditation habit was not done today, nor yesterday. Here are some tips on how to accomplish that task:
 
 - Use `:yesterday` in the `:inputs`. You also need to add another input variable in `:in`.
-- Use another `or-join` to determine which `?date` was yesterday. Most likely, you will need to add another variable in `:find`.
+- Use another `and` in the `or-join` to determine the length of a positive streak that would start from yesterday in to the past. Most likely, you will need to add another variable in `:find`.
 - Within `:view` introduce some more `if` statements for formatting the new information
+
+
+<details>
+ <summary><b>Click to see a possible solution!</b></summary>
+
+{% highlight clojure %}
+{
+ :title [:h1 "My current streaks"]
+
+ :query
+ [
+  :find (count ?p) (sum ?habit-today) (sum ?habit-yesterday) ?habit-name (min ?date)
+  :keys count today yesterday habit lastdate
+  :in $ ?today ?yesterday [?habit ...] [[?habit2 ?habit-name]] %
+
+  :where
+  [(= ?habit ?habit2)]
+  [?p_today :block/journal-day ?today]
+  [?p_today :block/journal? true]
+  [?p_yesterday :block/journal-day ?yesterday]
+  [?p_yesterday :block/journal? true]
+  (or-join [?p ?p_today ?p_yesterday ?habit ?habit-today ?habit-yesterday ?date]
+   (and 
+    (pages-next-day ?p ?p_today ?habit true ?date)
+    [(ground true) ?habit-today]
+    [(ground false) ?habit-yesterday]
+   )
+   (and
+    (habit-not-page ?p_today ?habit)
+    (pages-next-day ?p ?p_yesterday ?habit true ?date)
+    [(ground false) ?habit-today]
+    [(ground true) ?habit-yesterday]
+   ) 
+   (and
+    (habit-not-page ?p_today ?habit)
+    (pages-next-day ?p ?p_yesterday ?habit false _)
+    [(ground false) ?habit-today]
+    [(ground false) ?habit-yesterday]
+    [?p :block/journal-day ?date_]
+    [?p :block/original-name ?name]
+    [(vector ?date_ ?name) ?date]
+   )
+  )
+ ]
+ :inputs [:today :yesterday [:anki :duolingo :meditation] [[:anki "Anki"] [:duolingo "Duolingo"] [:meditation "Meditation"]] ]
+ :rules [
+ ;; similar to predefined property rule
+  [(test-property ?b ?type ?testval)
+   [?b :block/properties ?props]
+   [(get ?props ?type) ?val]
+   [(== ?val ?testval)]
+  ]
+  ;; check whether specific habit was done in tracker block
+  [(habit-block ?b ?habit ?val)
+   [test-property ?b :type "tracker"]
+   [test-property ?b ?habit ?val]
+  ]
+  [(habit-not-page ?p ?habit)
+   [?b :block/page ?p]
+   (habit-block ?b ?habit false)
+  ]
+  
+ [(get-backlink-page ?p1 ?p2 ?habit ?val)
+   [?b2 :block/page ?p2]
+   (habit-block ?b2 ?habit ?val)
+   [?b2 :block/refs ?p1]
+   [?p1 :block/journal? true]
+  ]
+   
+  [(pages-next-day ?p1 ?p2 ?habit ?val ?date)
+   (get-backlink-page ?p1 ?p2 ?habit ?val)
+   [?p2 :block/journal-day ?date2]
+   [?p2 :block/original-name ?name2]
+   [(vector ?date2 ?name2) ?date]
+  ]
+  [(pages-next-day ?p1 ?p2 ?habit ?val ?date)
+   ;; ?px is the page that ?p2 links to.
+   (get-backlink-page ?px ?p2 ?habit ?val)
+   (pages-next-day ?p1 ?px ?habit ?val ?date)
+  ]
+ ]
+ :view (fn [rows] [:table
+  [:thead
+   [:tr
+    [:th "Habit"]
+    [:th "Current streak"]
+    [:th "Start of current streak / End of last streak"]]]
+  [:tbody
+   (for [ r rows] [:tr
+    [:td (get r :habit)]
+    [:td (if (> (int (get r :today)) 0)
+     (+ "✔️ - " (get r :count) (if (> (int (get r :count)) 1) " days" " day"))
+     (if (> (int (get r :yesterday)) 0)
+      (+ "❌ - " (get r :count) (if (> (int (get r :count)) 1) " days" " day"))
+      "❌ ❌ ❌"
+     )
+    )]
+    [:td
+     [:a
+      {:href
+       (str "#/page/" (nth (get r :lastdate) 1))
+      } (nth (get r :lastdate) 1)
+      ]
+    ]
+   ])
+  ]
+ ])
+}
+{% endhighlight %}
+</details>
+<br />
 
 ### Hard to impossible
 

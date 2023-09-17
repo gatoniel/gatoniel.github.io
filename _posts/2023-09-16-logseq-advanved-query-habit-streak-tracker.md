@@ -7,7 +7,7 @@ categories: logseq
 ---
 # Tracking your habit streaks with advanced queries in logseq
 
-In this tutorial, I will walk you through an [advanced query](https://docs.logseq.com/#/page/advanced%20queries) in [logseq](https://logseq.com/) that keeps track of your habit streaks. This tutorial is mainly intended for educational purposes as there are many more (and potentially more efficient) ways to track your habits within logseq. We will cover the basic syntax for advanced queries, including the `:inputs` and `:rules` clauses, as well as definitions of recursive rules and producing a table view with HTML [hiccups](https://github.com/weavejester/hiccup). Furthermore, we will cover a way to count occurences based on conditions. Logseq uses datalog (more specifically the [datascript](https://github.com/tonsky/datascript) for queries and if you have not yet read the [learndatalogtoday tutorial](https://www.learndatalogtoday.org/) I highly encourage you to do it now.
+In this tutorial, I will walk you through an [advanced query](https://docs.logseq.com/#/page/advanced%20queries) in [logseq](https://logseq.com/) that keeps track of your habit streaks. This tutorial is mainly intended for educational purposes as there are many more (and potentially more efficient) ways to track your habits within logseq. We will cover the basic syntax for advanced queries, including the `:inputs` and `:rules` clauses, as well as definitions of recursive rules and producing a table view with HTML [hiccups](https://github.com/weavejester/hiccup). Furthermore, we will cover a way to count occurences based on conditions. Logseq uses datalog (more specifically [datascript](https://github.com/tonsky/datascript)) for the queries. If you have not yet read the [learndatalogtoday tutorial](https://www.learndatalogtoday.org/), I highly encourage you to do it now.
 
 ## The habits block
 
@@ -86,7 +86,7 @@ The above table is created by this advanced query:
    [?p1 :block/journal? true]
    [?p2 :block/journal-day ?date2]
    [?p2 :block/original-name ?name2]
-   [(vector ?date2 ?name2) ?date]]
+   [(vector ?date2 ?name2) ?date]
   ]
   [(pages-next-day ?p1 ?p2 ?habit ?val ?date)
    ;; fastest when we begin search at the known page ?p2
@@ -131,7 +131,7 @@ The above query is entirely enclosed by curly brackets. It is coarsely structure
 
 ### Overall concept
 
-The basic concept of the above query is similar to [chapter 8](https://www.learndatalogtoday.org/chapter/8) of the learndatalogtoday tutorial. Through the `backlink` property, all our journal pages are linked together in a sequential list. However, we are not interested in the endless sequential list, rather we are only interested in the uninterrupted sequence of journal pages. We use a recursive rule that exactly finds all pages that belong to this uninterrupted sequence. Once we have them, we just need to count them to find the length of the current streak.
+The basic concept of the above query is similar to [chapter 8](https://www.learndatalogtoday.org/chapter/8) of the learndatalogtoday tutorial. Through the `backlink` property, all our journal pages are linked together in a sequential list. However, we are not interested in the endless sequential list, rather we are only interested in the latest uninterrupted sequence of journal pages where the habit has been ticked as done. We use a recursive rule that exactly finds all pages that belong to this uninterrupted sequence. Once we have them, we just need to count them to find the length of the current streak.
 
 ### Start of `:query`
 
@@ -164,7 +164,7 @@ First, we require that the values of `?habit` and `?habit2` are equal. Don't bot
 
 Next, we are going to use an [`or-join`](https://docs.datomic.com/cloud/query/query-data-reference.html#or-join) clause that allows us to count two different cases. Either, the habit is ticked as done today or not. If it is ticked as done today, we want to know the length of the current streak. If the habit was not yet done, we want to know when we last did that habit. This second question can equally be framed as searching an uninterrupted sequence of days where the habit was *not* done. We will employ a scheme that is also described in this [stackoverflow answer](https://stackoverflow.com/a/47417128/10106730). In the `:find` statement we used the aggregation `(count ?p)` which will give us the correct length of the positive and negative streaks. Therefore, we need to define a new variable that determines in which part of the `or-join` clause we counted; it determines whether we counted pages of a positive or negative streak. This new variable is `?habit-today` and we saw it previously in the `:find` statement where we used the `sum` aggregation for it.
 
-Before we jump into the specifics of the `or-join` clause, I want to mention two minor details. Recall, first, that those conditions within the `or-join` that need to be connected by and-logic need to go into an `and`clause. Second, the `[?p ?p_today ?habit ?habit-today ?date]` defines which variables within the `or-join` clause are bound to variables defined outside of the clause. All other variables within the `or-join` clause are not available outside of it.
+Before we jump into the specifics of the `or-join` clause, I want to mention two minor details. Recall, first, that those conditions within the `or-join` that need to be connected by and-logic need to go into an `and` clause. Second, the `[?p ?p_today ?habit ?habit-today ?date]` defines which variables within the `or-join` clause are bound to variables defined outside of the clause. All other variables within the `or-join` clause are not available outside of it.
 
 #### Detecting a positive streak
 
@@ -196,7 +196,7 @@ Let's briefly discuss the five variables that go into the `or-join` clause, `?p`
 
 The second `and` clause is for detecting a negative streak. It starts with the same customly defined rule as the first `and` clause. However, the fourth argument is `false` instead of `true`. Furthermore, we do ommit (`_`) the last variable that previously was bound to `?date`. In the second line, we set `?habit-today` to `false` to mark that we have found a negative streak. Beware, only the first line in one of the two `and` clauses will evaluate to true and, hence, only one of the lines with the `ground` statement will actually be executed. This is not due to the quality of the `or-join` or the `and` clauses. Rather, this is due to the logic of the data itself and the logic of the `pages-next-day` customly defined rule.
 
-This clause has three more lines: these lines are used to extract the date information associated with the page `?p`. Here, we use the `vector` statement to pack the `?date_` of type int and the nicely formatted name of the date `?name` into one variable `?date`. In the `:find` statement, we have the `min` aggregation for the `?date` variable. By definition, Datascript will return the tuple with minimal first entry. This is why we add the `int` type `?date_` to the tuple first.
+This clause has three more lines: these lines are used to extract the date information associated with the page `?p`. Here, we use the `vector` statement to pack the `?date_` of type `int` and the nicely formatted name of the date `?name` into one variable `?date`. In the `:find` statement, we have the `min` aggregation for the `?date` variable. By definition, datascript will return the tuple with minimal first entry. This is why we add the `int` type `?date_` to the tuple first.
 
 With this, we are at the end of the `:where` statement. Before we draw our attention to the `:rules` part where the logic of the `:where` continues, let's briefly look at the `:inputs` statement.
 
@@ -240,7 +240,7 @@ Before we look at the recursively defined rule---the core of the query---we will
    [test-property ?b ?habit ?val]
   ]
 ```
-The `test-property` rule is very similar to the predefined `property` rule. However, the predefind `property` rule is not available within the `:rules` statement; it seems to be only available within the `:where` clause. Nevertheless, let's discuss. `test-property` expects three variables `?b`, `?type`, and `?testval`. In the first line of the rule body, we introduce a new variable `?props` and bind it to the block properties of `?b`. Therefore, `?b` is a variable for a block. In the next line, we retrieve the value from `?props` that is given by `?type` and bind it to the new variable `?val`. Finally, the rule tests whether the values of `?val` and `?testval` are similar. In conclusion, `test-property` expects a block reference in `?p` and evaluates to true only if there is a property within that block with the name given by `?type` and if that property has the same value as given by `?testval`.
+The `test-property` rule is very similar to the predefined `property` rule. However, the predefind `property` rule is not available within the `:rules` statement; it seems to be only available within the `:where` clause. Nevertheless, let's discuss. `test-property` expects three variables `?b`, `?type`, and `?testval`. In the first line of the rule body, we introduce a new variable `?props` and bind it to the block properties of `?b`. Therefore, `?b` is a variable for a block. `?props` is a map that contains keys and associated values which can be retrieved with the `get` function. In the next line, we retrieve the value from `?props` that is given by `?type` and bind it to the new variable `?val`. Finally, the rule tests whether the values of `?val` and `?testval` are similar. In conclusion, `test-property` expects a block reference in `?p` and evaluates to true only if there is a property within that block with the name given by `?type` and if that property has the same value as given by `?testval`.
 
 The next helper rule takes advantage of the previously defined rule. `habit-block` first tests whether a given block `?b` is a block that is used for tracking habits. Next, the rule checks whether the `?habit` in question has the value given by `?val`.
 
@@ -259,7 +259,7 @@ In datalog / datascript a recursive rule is defined by writing down the same rul
    [?p1 :block/journal? true]
    [?p2 :block/journal-day ?date2]
    [?p2 :block/original-name ?name2]
-   [(vector ?date2 ?name2) ?date]]
+   [(vector ?date2 ?name2) ?date]
   ]
 ```
 
@@ -282,7 +282,7 @@ But first, let's think about what the rule can do so far: it can tell us whether
 
 The first two lines of the second definition are exactly the same as before. This is a common theme for recursicely defined rules. But now we introduce the mysterious intermediate day `?px`. By the definition of our data scheme (the `backlink` property), we know that `?px` is the direct predecessor of `?p2`. Now instead of finding out whether `?p1` and `?p2` are connected, we only need to find out whether `?p1` and `?px` are connected. And as the rule definition is recursive, we will find a definite answer sometime.
 
-There is one subtlety in the last line: given that in the first definition `?date` was associated to `?p2`, in the second definition `?date` is associated to `?px`. In other words, by recursive execution, `?date` will always be associated to the date of the day after `?p1`. However, for the day `?p1` we never test if the habit was done. Hence, `?date` is associated to alle the days the habit was done. This suffices if we want to know the start of a positive streak. In case of a negative streak, however, we would like to know the day before that streak started as, after all, that is the day the previous positive streak ended. That is why we extract different `?date` variables in the two `and` clauses above.
+There is one subtlety in the last line: given that in the first definition `?date` was associated to `?p2`, in the second definition, `?date` is associated to `?px`. In other words, by recursive execution, `?date` will always be associated to the date of the day after `?p1`. However, for the day `?p1` we never test if the habit was done. Hence, `?date` is associated to alle the days the habit was done. This suffices if we want to know the start of a positive streak. In case of a negative streak, however, we would like to know the day before that streak started as, after all, that is the day the previous positive streak ended. That is why we extract different `?date` variables in the two `and` clauses above.
 
 
 #### Best practices for efficiency in recursive rules
@@ -325,7 +325,7 @@ Our query will return a list of results. The length of that list and its content
   :in $ ?today [?habit ...] [[?habit2 ?habit-name]] %
 ```
 
-Given the aggregation functions in the `:find` statement, we will get one result per `?habit-name`. With the `:keys` statement, we require the query to return a map (similar to dictionaries in Python). Hence, we have a list of maps as output of the query. We formate it with these lines of code.
+Given the aggregation functions in the `:find` statement, we will get one result per `?habit-name`. With the `:keys` statement, we require the query to return a map (similar to dictionaries in Python). Hence, we have a list of maps as output of the query. We format it with these lines of code.
 
 ```clojure
  :view (fn [rows] [:table
@@ -354,5 +354,52 @@ Given the aggregation functions in the `:find` statement, we will get one result
 ```
 
 The `:view` keyword requires the definition of a function which we start with the opening round bracket `(` and the `fn` keyword. This function expects a list, that we bind to the variable `rows` within the function. Then, we use [Clojure's hiccup](https://github.com/weavejester/hiccup) to open a `[:table`. Beware, that this table is closed by a square bracket `]` only later. Similarly, we define the table head and then the table body. After opening the table body, we start a `for` loop, that iterates over `rows` and puts its list elements into the variable `r`. Recall, `r` is a map (dictionary). Within the loop, we open for each `r` a html row with the hiccup `[:tr` that obviously needs to be closed again within the loop. The first column of the table should give the name of the habit. We retrieve it with `(get r :habit)` where `:habit` is the key to the actual habit name, as was defined in the `:keys` statement. Next comes an `if` statement differentiating between positive and negative streaks as `:today` points to the result of `(sum ?habit-today)`. In case of a positive habit, we have another `if` statement to distinguish between one day and several day**s**. As in both `if` statements we want to compare integers, we have to convert the results to integers with the `int` function. In the third column we create a link to the page being either the start of a positive streak or, in case of a negative streak, the end of the previous positive streak. The function `str` concatenates several strings to one long string. The only new thing here is the use of `nth` to unpack the values of the `:lastdate` / `?date` tuple.
+
+## Your homework
+
+### Easy: define a new custom rule
+You might have noticed that the first three lines of the two definitions of the `pages-next-day` rule are similar. In such cases it is always advisable to reduce similar logic into a separate rule: Rewrite these rules by introducing a new rule `get-backlink-page`.
+
+<details>
+ <summary><b>Click to see a possible solution!</b></summary>
+
+{% highlight clojure %}
+  [(get-backlink-page ?p1 ?p2 ?habit ?val)
+   [?b2 :block/page ?p2]
+   (habit-block ?b2 ?habit ?val)
+   [?b2 :block/refs ?p1]
+   [?p1 :block/journal? true]
+  ]
+   
+  [(pages-next-day ?p1 ?p2 ?habit ?val ?date)
+   (get-backlink-page ?p1 ?p2 ?habit ?val)
+   [?p2 :block/journal-day ?date2]
+   [?p2 :block/original-name ?name2]
+   [(vector ?date2 ?name2) ?date]
+  ]
+  [(pages-next-day ?p1 ?p2 ?habit ?val ?date)
+   ;; ?px is the page that ?p2 links to.
+   (get-backlink-page ?px ?p2 ?habit ?val)
+   (pages-next-day ?p1 ?px ?habit ?val ?date)
+  ]
+{% endhighlight %}
+</details>
+<br />
+
+### Easy: Caching and debugging
+
+Once your habits extend to 30+ days you might see that this query still takes up to 10 seconds to execute. I would love to add some caching to the query, but such optionality does not yet exist. Furthermore, I would like to debug the runtimes of different queries to further speed up the query. However, I have not yet investigated on how to do proper debugging with these advanced queries.
+
+### Advanced
+
+If a habit was not yet done today, the only information being displayed is when the habit was done last. Can you script a query that distinguishes between a habit that was last done yesterday (a streak that has to be continued today) and a habit that you stopped doing long ago (you will not lose a currently runnning streak if you miss this habit today). I have not modified the query for this myself. Until I can supply you with a working solution, here are some thoughts:
+
+- Use `:yesterday` in the `:inputs`. You also need to add another input variable in `:in`.
+- Use another `or-join` to determine which `?date` was yesterday. Most likely, you will need to add another variable in `:find`.
+- Within `:view` introduce some more `if` statements for formatting the new information
+
+### Hard to impossible
+
+Do you think you can modify the query to encompass different frequencies for the habits? Say one habit needs to be done daily, but another one only needs to be done weekly. I guess datascript could in principle be used for that, but the logic becomes increasingly complicated.
 
 With this, we are at the end of the tutorial. I hope you're ready to use this advanced query to track your own habits or to create your own advanced queries with all the possibilites given by logseq. If you find bugs or have suggestions, feel free to file an [issue](https://github.com/gatoniel/gatoniel.github.io/issues). In case you have broader questions, try the [logseq forum](https://discuss.logseq.com/tag/queries).
